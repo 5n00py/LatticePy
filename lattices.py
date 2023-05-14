@@ -1,144 +1,219 @@
+"""
+This python file contains a collection of functions for performing various 
+computations on lattices.
+
+The functions provided in this file can be used to perform various operations 
+on lattices such as transforming a basis with unimodular operations, computing 
+the Gram matrix of a lattice, calculating the determinant of a lattice, 
+performing the Gram-Schmidt orthogonalization process, executing the 
+Lenstra-Lenstra-Lovasz (LLL) lattice basis reduction algorithm, decomposing a 
+symmetric positive definite matrix using the Cholesky method, and finally 
+performing the Fincke-Pohst enumeration algorithm to find all short lattice vectors.
+
+These functions are useful for tasks involving lattice operations and can be 
+used as standalone tools or incorporated into larger systems as needed.
+
+All functions take NumPy ndarrays as inputs and return NumPy ndarrays or Python 
+lists as outputs, ensuring compatibility with a wide range of Python libraries 
+and tools.
+
+Function Descriptions:
+
+1. transform_basis_with_unimodular(): Performs unimodular row operations on a 
+        matrix, providing another basis of the same lattice.
+2. compute_gram_matrix(): Computes the Gram matrix of a given lattice.
+3. compute_lattice_determinant(): Computes the determinant of a given lattice.
+4. perform_gram_schmidt(): Performs the classical Gram-Schmidt algorithm to 
+        convert an arbitrary basis of R^n into an orthogonal basis.
+5. perform_lll_reduction(): Performs the Lenstra-Lenstra-Lovasz (LLL) lattice 
+        basis reduction algorithm.
+6. cholesky_DU(): Performs a Cholesky decomposition of a symmetric positive 
+        definite mxm matrix.
+7. fincke_pohst(): The Fincke-Pohst Algorithm for finding all vectors in a 
+        lattice with length less than a given upper bound.
+8. fincke_pohst_with_lll(): Combines the Fincke-Pohst algorithm with the LLL 
+        reduction for increased efficiency.
+
+NOTE: This file is intended for use in conjunction with the NumPy library for 
+        numerical computations in Python.
+"""
+
 import numpy as np
-from numpy.linalg import inv
 import math
+
 from copy import deepcopy
-from random import randint
+from numpy import ndarray
+from numpy.linalg import inv
 from numpy.linalg import norm
+from numpy.random import randint
+from typing import List
+from typing import Tuple
 
 
-'''
-A unimodular row operation on a matrix is one of the following elementary row operations:
-* multiply any row by -1,
-* interchange any two rows,
-* add an integral multiple of any row to any other row.
-If we apply unimodular row operations to the matrix X whose rows contain a basis of a
-lattice L, then we obtain another basis ot the same lattice.
+def transform_basis_with_unimodular(X: ndarray, k: int, r: int) -> ndarray:
+    """
+    Apply unimodular row operations on a matrix, providing another basis of the 
+    same lattice.
 
-Input:
-------
-* A 2d ndarray that represents a matrix X whose rows x1,x2,..,xn of R^n contain a basis of
-   a lattice L.
-* An operation count k: the number of unimodular row operations to be applied to the matrix X.
-* A range parameter r to limit the scalars.
+    A unimodular row operation on a matrix can be one of the following 
+    elementary row operations:
+    * Multiply any row by -1,
+    * Interchange any two rows,
+    * Add an integral multiple of any row to any other row.
+    By applying these operations, we can obtain another basis of the same lattice.
 
-Output:
-------
-* A 2d ndarray whose row vectors are another basis of the same lattice L.
-'''
-def unimodular_row_operations(X,k,r):
+    Parameters
+    ----------
+    X : ndarray
+        A 2D ndarray representing a matrix whose rows form a basis of a lattice.
+    k : int
+        The number of unimodular row operations to apply to the matrix.
+    r : int
+        A range parameter to limit the integral multiples.
 
-    # m is the number of rows and n the number of columns.
-    m,n = X.shape
+    Returns
+    -------
+    ndarray
+        A 2D ndarray whose row vectors form another basis of the same lattice.
 
-    # Apply k unimodular row operations
-    for i in range(k):
-        # There are 3 kind of possible unimodular row operations,
-        # so choose randomly which one to be applied next.
-        c = randint(1,3)
+    Example
+    -------
+    >>> import numpy as np
+    >>> X = np.array([[1, 2], [3, 4]])
+    >>> print(unimodular_row_operations(X, 3, 5))
+    """
 
-        # The 1st option is to multiply any row by -1:
-        if (c==1):
+    m, _ = X.shape
 
-            # choose the row randomly
-            row = randint(0,m-1)
+    for _ in range(k):
+        operation = randint(1, 4)
 
-            X[row] = deepcopy(X[row] * (-1))
+        # Multiply a row by -1
+        if operation == 1:
+            row = randint(0, m)
+            X[row] *= -1
 
-        # The 2nd option is to interchange any two rows:
-        elif (c==2):
-            # Choose two rows randomly:
-            row1 = randint(0,m-1)
-            row2 = randint(0,m-1)
+        # Interchange two rows
+        elif operation == 2:
+            row1, row2 = randint(0, m, 2)
+            X[[row1, row2]] = X[[row2, row1]]
 
-            # Interchange the rows:
-            tmp = deepcopy(X[row1])
-            X[row1] = deepcopy(X[row2])
-            X[row2] = deepcopy(tmp)
-
-        # The 3rd option is to add an integral multiple of any row to any other row.
+        # Add an integral multiple of a row to another row
         else:
-            # Choose two rows randomly:
-            row1 = randint(0,m-1)
-            row2 = randint(0,m-1)
-            # they have to be different:
-            if (row1 == row2):
-                while (row1==row2):
-                    row2 = randint(0,m-1)
+            row1, row2 = randint(0, m, 2)
+            while row1 == row2:
+                row2 = randint(0, m)
 
-            # Chosse the integral multiple randomly:
-            s = randint(1,r)
-
-            X[row1] = deepcopy(X[row1]) + s*deepcopy(X[row2])
+            scalar = randint(1, r + 1)
+            X[row1] += scalar * X[row2]
 
     return X
 
 
+def compute_gram_matrix(X: ndarray) -> ndarray:
+    """
+    Computes the Gram matrix of a given lattice.
 
+    The Gram matrix delta(L) of the lattice L is the m x m matrix in which the 
+    (i,j) entry is the scalar product of the i-th and j-th basis vectors. It's 
+    associated with a set of vectors that spans an m-dimensional lattice in R^n.
 
-'''
-The Gram matrix delta(L) of the lattice L is the mxn matrix in which the (i,j) entry
-is the scalar product of the i-th and j-th basis vectors.
+    Parameters
+    ----------
+    X : ndarray
+        A 2D ndarray representing a matrix. Its rows x1, x2, ..., xm are linearly 
+        independent vectors in R^m (m <= n) that span an m-dimensional lattice L.
 
-Input:
-------
-* A 2d ndarray that represents an matrix X whose rows x1,x2,..,xm are linearly independent vectors in R^m (m<=n)
-  that spann an m-dimensional lattice L
+    Returns
+    -------
+    ndarray
+        The m x m Gram matrix of the lattice L.
 
-Output:
--------
-* A 2d ndarray that is the mxm Gram matrix of the lattice L.
-'''
-def gram_matrix(X):
+    Example
+    -------
+    >>> import numpy as np
+    >>> X = np.array([[1, 0], [0, 1]])
+    >>> compute_gram_matrix(X)
+    array([[1, 0],
+           [0, 1]])
+    """
     Xt = X.transpose()
     G = X.dot(Xt)
     return G
 
 
+def compute_lattice_determinant(X: ndarray) -> float:
+    """
+    Compute the determinant of a given lattice.
 
+    The determinant of a lattice L is defined as the square root of the 
+    determinant of its Gram matrix. The determinant of a lattice does not depend 
+    on the choice of basis. 
+    There is a geometric interpretation: The determinant is the m-dimensional 
+    volume of the parallelipiped in R^n whose edges are the lattice basis vectors.
 
-'''
-The determinant of a lattice L is defined as the square root of its Gram matrix.
-Note that the determinant of a lattice does not depend on the choice of basis.
-There is a geometric interpretation: The determinant is the m-dimensional volume of
-the parallelipiped in R^n whose edges are the lattice basis vectors.
+    Parameters
+    ----------
+    X : ndarray
+        A 2D ndarray representing a matrix. Its rows x1, x2, ..., xm are 
+        linearly independent vectors in R^m (m <= n) that span an m-dimensional 
+        lattice L.
 
-Input:
-------
-* A 2d ndarray that represents an matrix X whose rows x1,x2,..,xm are linearly independent vectors in R^m (m<=n)
-  that spann an m-dimensional lattice L
+    Returns
+    -------
+    float
+        The determinant of the Lattice L.
 
-Output:
-------
-* The determinant of the Lattice L.
-'''
-def lattice_determinant(X):
-    G = gram_matrix(X)
+    Example
+    -------
+    >>> import numpy as np
+    >>> X = np.array([[1, 0], [0, 1]])
+    >>> compute_lattice_determinant(X)
+    1.0
+    """
+    G = compute_gram_matrix(X)
     detG = np.linalg.det(G)
     result = math.sqrt(detG)
     return result
 
 
+def perform_gram_schmidt(X: ndarray) -> Tuple[ndarray, ndarray]:
+    """
+    Perform the classical Gram-Schmidt algorithm for converting an arbitrary basis of
+    R^n into an orthogonal basis. Vectors are not normalized in this function.
 
+    Parameters
+    ----------
+    X : ndarray
+        A 2D ndarray representing an nxn matrix in which row i is the vector xi.
+        The rows x1,x2,...xn build a basis in R^n.
 
-'''
-Perform the classical Gram-Schmidt algorithm for converting an arbitrary basis of
-R^n into an orthogonal basis. We do not normalize the vectors here.
+    Returns
+    -------
+    Tuple[ndarray, ndarray]
+        A tuple containing two 2D ndarrays. The first represents an nxn matrix Y in 
+        which row i is the vector yi. The rows y1,y2,...,yn build an orthogonal basis in R^n.
+        The second represents the Gram-matrix M (the matrix of GSO coefficients) with X = MY.
 
-Input:
-------
-* A 2d ndarray that represents an nxn matrix in which row(!) i is the vector xi.
-  The rows x1,x2,...xn build a basis in R^n.
+    Note
+    ----
+    The Gram-Schmidt basis vectors y1, y2, ... ,yn are usually not in the lattice 
+    generated by x1,...,xn. In general y1,...,yn are not integral linear combinations of x1,...,xn.
 
-Output:
-------
-* A 2d ndarray that represents an nxn matrix Y in which row i is the vector yi.
-  The rows y1,y2,...,yn build an orthogonal basis in R^n.
-* A 2d ndarray that represents the Gram-matrix M (the matrix of GSO coefficients) with X = MY.
-
-Note: The Gram-Schmidt basis vectors y1, y2, ... ,yn are usually not in the lattice generated by x1,...,xn.
-In general y1,...,yn are not integral linear combinations of x1,...,xn.
-'''
-def gram_schmidt(X):
+    Example
+    -------
+    >>> import numpy as np
+    >>> X = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    >>> Y, M = perform_gram_schmidt(X)
+    >>> print(Y)
+    array([[1., 0., 0.],
+           [0., 1., 0.],
+           [0., 0., 1.]])
+    >>> print(M)
+    array([[1., 0., 0.],
+           [0., 1., 0.],
+           [0., 0., 1.]])
+    """
     n, m = X.shape
 
     X = X.astype(float)
@@ -154,317 +229,272 @@ def gram_schmidt(X):
     for i in range(n):
         M[i][i] = 1
 
-    return Y,M
+    return Y, M
 
 
-
-
-'''
-This algorithm is called the LLL algorithm after the initials of its authors,
-A. K. Lenstra, H. W. Lenstra Jr. und L. Lovasz.
-It is a polynomial time lattice reduction algorithm. Suppose we are given a "bad" basis x1,x2,...xn = X of
-a lattice L. Using the LLL algorithm we can find a "good" basis x1', x2',...,xn' = X'. Each vector xi' is
-"almost orthogonal" to the span of the previous vectors.
-Suppose (x_1',x_2',...x_n') is a basis of R^n and (x_1*,x_2*,...x_n*) its Gram-Schmidt orthogonal basis. The basis
-(x_1',x_2',...x_n') is called reduced, if
+def perform_lll_reduction(X: ndarray) -> ndarray:
+    """
+    Perform Lenstra-Lenstra-Lovasz (LLL) algorithm, a polynomial time lattice 
+    reduction algorithm.
+    
+    Given a "bad" basis of a lattice, this algorithm finds a "good" basis where 
+    each vector is "almost orthogonal" to the span of the previous vectors. 
+    The basis is called reduced if 
     ||x_i*||^2 <= 2 ||x_i+1||^2 for 1 <= i < n.
-The reduction parameter a (alpha) has here the standard value of 3/4, and therefore the auxiliary parameter
-b (beta) = 4/(4a-1) is 2.
 
-Input:
-------
-* A 2d ndarray that represents a matrix X whose rows x1,x2,..,xm are linearly independent vectors in R^n (m<=n)
-  that spann an m-dimensional lattice L
+    Parameters
+    ----------
+    X : ndarray
+        A 2D ndarray representing a matrix where rows are linearly independent 
+        vectors in R^n that span an m-dimensional lattice L.
 
-Output:
--------
-* A 2d ndarray that repersents a matrix X' whose rows x1',x2',...,xm' are a reduced basis of the basis X.
-'''
-def lll(X):
+    Returns
+    -------
+    ndarray
+        A 2D ndarray representing a matrix X' whose rows are a reduced basis of 
+        the basis X.
 
+    Raises
+    ------
+    ValueError
+        If the number of basis vectors exceeds the space dimensionality.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> X = np.array([[1, 0, 0], [1, 1, 0], [1, 1, 1]])
+    >>> X_prime = perform_lll_reduction(X)
+    >>> print(X_prime)
+    array([[1., 0., 0.],
+           [0., 1., 0.],
+           [0., 0., 1.]])
+    """
     m, n = X.shape
 
     if m > n:
-        raise ValueError('The number of basis vectors excees the space dimensionality')
+        raise ValueError('The number of basis vectors exceeds the space dimensionality')
 
     X = X.astype(float)
 
-    Y,M = gram_schmidt(X)
-
-    alpha = 0.5
+    Y,M = perform_gram_schmidt(X)
 
     i = 1
-    while(i<m):
-
-        for j in range(i-1,-1,-1):
-
-            X[i] = deepcopy(X[i]) - int(round(deepcopy(M[i,j]))) * deepcopy(X[j])
-
-            if abs(M[i,j] > 0.5):
-                # update the GSO:
-                Y,M = gram_schmidt(X)
-
-        # For standard value a = 3/4 resp. b = 2:
-        if (i>0) and (norm(Y[i-1])**2 > 2 * norm(Y[i])**2):
-            # Interchange X[i] and X[i-1]:
-            tmp = deepcopy(X[i])
-            X[i] = deepcopy(X[i-1])
-            X[i-1] = deepcopy(tmp)
-
-            # Update the GSO:
-            Y,M = gram_schmidt(X)
-
-            i = i-1
-
+    while(i < m):
+        for j in range(i-1, -1, -1):
+            mu = int(round(M[i, j]))
+            X[i] -= mu * X[j]
+            if abs(M[i, j]) > 0.5:
+                Y, M = perform_gram_schmidt(X)
+        
+        if (i > 0) and (norm(Y[i-1])**2 > 2 * norm(Y[i])**2):
+            X[i], X[i-1] = X[i-1], X[i]  # Interchange X[i] and X[i-1]
+            Y, M = perform_gram_schmidt(X)
+            i -= 1
         else:
-            i = i+1
+            i += 1
 
     return X
 
 
+def cholesky_DU(G: ndarray) -> Tuple[ndarray, ndarray]:
+    """
+    Perform a Cholesky decomposition of a symmetric positive definite mxm matrix G.
+    The output is a diagonal mxm matrix D and an upper triangular matrix U with ones on
+    the diagonal such that G = U^tDU. This is a slightly modified version of the classical 
+    Cholesky decomposition R^tR.
 
+    Parameters
+    ----------
+    G : ndarray
+        A 2D ndarray representing a symmetric positive definite mxm matrix.
 
-'''
-Perform a Cholesky decomposition of a symmetric positive definite mxm matrix G.
-Output is a diagonal mxm matrix D and an upper triangular matrix U with ones on
-the diagonal such that G = U^tDU.
-This is a slightly modified version of the classical Cholesky decomposition R^tR.
-'''
-def cholesky_DU(G):
+    Returns
+    -------
+    D : ndarray
+        A 2D ndarray representing the diagonal matrix D.
+    
+    U : ndarray
+        A 2D ndarray representing the upper triangular matrix U.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> G = np.array([[4, 12, -16], [12, 37, -43], [-16, -43, 98]])
+    >>> D, U = cholesky_DU(G)
+    >>> print("D = ", D)
+    >>> print("U = ", U)
+    """
     U = G.astype(float)
     m = len(U)
 
     for j in range(m - 1):
         for i in range(j + 1, m):
-            # Add -Uij/Ujj times row j of U to row i:
             q = - U[i, j] / U[j, j]
-            for k in range(m):
-                U[i, k] = U[i, k] + q * U[j, k]
+            U[i, :] += q * U[j, :]
 
-    # D is a diagonal matrix with positive entries d1,...dm on the diagonal:
-    D = np.zeros((m, m))
-    for i in range(m):
-        D[i, i] = U[i, i]
+    D = np.diag(np.diag(U))  # Diagonal matrix with positive entries on the diagonal
 
-    # Make sure that U has ones on the diagonal:
-    for i in range(m):
-        for j in range(m):
-            U[i, j] = U[i, j] / D[i, i]
+    # Ensure U has ones on the diagonal
+    U = U / np.sqrt(D)
 
     return D, U
 
 
+def fincke_pohst(Bt: ndarray, C: float) -> List[ndarray]:
+    """
+    The Fincke-Pohst Algorithm is an algorithm for finding not merely one short vector
+    in a lattice, but for enumerating all vectors in a lattice with length less than
+    a given upper bound C. In particular, this allows us to determine a shortest nonzero
+    lattice vector.
 
+    Parameters
+    ----------
+    Bt : ndarray
+        A 2D ndarray representing a matrix whose rows are linearly independent vectors in R^n 
+        that span an m-dimensional lattice L.
 
-'''
-The Fincke-Pohst Algorithm is an algorithm for finding not merely one short vector
-in a lattice, but for enumerating all vectors in a lattice with length less than
-a given upper bound C. In particular, this allows us to determine a shortest nonzero
-lattice vector.
+    C : float
+        An upper bound for the euclidian square length of the lattice vectors.
 
-Input:
-------
-* A 2d ndarray that represents a matrix Bt whose rows x1,x2,..,xm are linearly independent vectors in R^n (m<=n)
-  that spann an m-dimensional lattice L
+    Returns
+    -------
+    vector_list : list of ndarray
+        The lattice vectors with square length at most C.
 
-* An upper Bound C for the euclidian square length of the lattice vectors.
+    Example
+    -------
+    >>> import numpy as np
+    >>> Bt = np.array([[1, 1, 1], [1, 0, 0], [0, 1, 0]])
+    >>> C = 3.0
+    >>> vectors = fincke_pohst(Bt, C)
+    >>> print(vectors)
+    """
+    m, n = Bt.shape
 
-Output:
--------
-* The lattice vectors with square length at most C.
-'''
-def fincke_pohst(Bt, C):
-
-    m,n = Bt.shape
-
-    if m>n:
-        raise ValueError('The number of basis vectors excees the space dimensionality')
+    if m > n:
+        raise ValueError('The number of basis vectors exceeds the space dimensionality')
 
     Bt = Bt.astype(float)
-
     B = Bt.transpose()
 
-    # Calculate the Gram matrix for the basis.
-    # Note that G is a symmetric positive definite matrix.
-    G = Bt.dot(B)
+    G = Bt @ B  # Compute the Gram matrix
 
-    # Get the matrices D and U of the Choleksy decomposition G = U^tDU.
-    D, U = cholesky_DU(G)
-    # D is a diagonal matrix with positive entries d1...dm on the diagonal,
-    # U is an upper triangular matrix with ones on the diagonal.
+    D, U = cholesky_DU(G)  # Perform Cholesky decomposition
 
-    # G has size mxm.
     m = len(G)
 
-    results = []
-    zero_vector = np.zeros((m))
-    results.append(zero_vector)
+    results = [np.zeros(m)]
 
-    # Any vector in the lattice is an integral linear combination of the basis
-    # vectors b1,b2,...,bm (which are tge column of the nxm matrix B) with a
-    # coefficient vector x = [x1,x2,...,xm].
-
-    # We obtain the range of possible values for xk as k decreases from m down to 1,
-    # respectively in the array notation form m-1 down to 0:
-    for k in range(m-1,-1,-1):
+    for k in reversed(range(m)):
 
         new_results = []
 
         for r in results:
-            x = r
+            x = r.copy()
 
-            # Sk = sum_{i=k+1}^{m} ( D[i,i] * (x[i] + sum_{j=i+1}^{m] ( U[i,j] * x[j] ) )^2 )
-            Sk = sum(D[i,i] * (x[i] + sum(U[i,j]*x[j] for j in range(i+1,m)) )**2 for i in range(k+1,m))
+            Sk = sum(D[i, i] * (x[i] + sum(U[i, j] * x[j] for j in range(i + 1, m))) ** 2 for i in range(k + 1, m))
+            Tk = sum(U[k, j] * x[j] for j in range(k + 1, m))
 
-            # Tk = sum_{j=k+1}^{m} ( U[k,j] * x[j] )
-            Tk = sum(U[k,j]*x[j] for j in range(k+1,m))
+            lower_bound = math.ceil(-math.sqrt((C - Sk) / D[k, k]) - Tk)
+            upper_bound = math.floor(math.sqrt((C - Sk) / D[k, k]) - Tk)
 
-            lower_bound = math.ceil(- math.sqrt((C-Sk)/D[k,k])-Tk)
-            upper_bound = math.floor(math.sqrt((C-Sk)/D[k,k])-Tk)
-
-            # The possible values for xk are the integers in the range lowerBound to upperBound.
-            # The list of partial results from the previous step is extended by including each
-            # possible value of the new coefficient.
-            for xk in range(int(lower_bound), int(upper_bound)+1, 1):
+            for xk in range(int(lower_bound), int(upper_bound) + 1):
                 x[k] = xk
-                new_results.append(deepcopy(x))
+                new_results.append(x.copy())
 
         results = new_results
 
-    vector_list = []
-    for x in results:
-        np.asarray(x)
+    vector_list = [B @ x for x in results]
 
-        # v = Bx gives the short lattice vectors for each coefficient vector x.
-        v = B.dot(x)
-        v = v.astype(int)
-        vector_list.append(v)
-
-    # To make the results more suitable, let's sort them by euclidian norm.
-    vector_list.sort(key=norm)
+    vector_list.sort(key=np.linalg.norm)
 
     return vector_list
 
 
+def fincke_pohst_with_lll(Bt: ndarray, C: float) -> List[ndarray]:
+    """
+    Combined with the LLL algorithm, the FP algorithm becomes a more efficient 
+    hybrid. This function uses the LLL algorithm to modify the quadratic form 
+    obtained from the Gram matrix of the lattice basis, which diminishes the 
+    ranges for the components of the partial coordinate vectors.
 
+    Also, it reorders the vectors in the computation of the rational Cholesky 
+    decomposition of the Gram matrix, increasing the chance that a partial 
+    coordinate vector cannot be extended.
 
-'''
-Combined with the LLL algorithm, the FP algorithm becomes a more efficient hybrid.
-This involves two insights:
-* We can use the LLL algorithm to modify the quadratic form obtained for from the Gram matrix
-  of the lattice basis; this will diminish the ranges for the components of the partial coordinate vectors.
-* We can reorder the vectors in the computation of the rational Cholesky decomposition of the Gram matrix;
-  this will increase the chance that a partial coordinate vector cannot be extended.
-'''
-def fincke_pohst_with_lll(Bt,C):
+    Parameters
+    ----------
+    Bt : ndarray
+        The input matrix.
+    C : float
+        The constant for the range of the result vectors.
 
+    Returns
+    -------
+    list
+        List of sorted short lattice vectors.
+    """
+    
     m, n = Bt.shape
 
     if m > n:
-        raise ValueError('The number of basis vectors excees the space dimensionality')
+        raise ValueError('The number of basis vectors exceeds the space dimensionality')
 
     Bt = Bt.astype(float)
-
     B = Bt.transpose()
 
     # Compute the Gram matrix.
     G = Bt.dot(B)
 
-    # Make the classical Cholesky decomposition G = R^t R = L L^t
+    # Perform classical Cholesky decomposition
     L = np.linalg.cholesky(G)
     R = L.transpose()
 
-    # We consider the inverse matrix R^(-1) and the m-dimensional lattice in R^m with basis
-    # consisting of the rows of R^(-1).
     Rinv = inv(R)
-    # We apply the LLL algorithm to this basis, and obtain a reduced basis which we regard as the rows of
-    # the matrix S^(-1):
-    Sinv = lll(Rinv)
+    Sinv = perform_lll_reduction(Rinv)
 
-    # The change basis matrix from the rows of R^(-1) to the rows of S^(-1) will be denoted by X^(-1),
-    # so we have the formula X = (S^(-1) R)^(-1).
     X = inv(Sinv.dot(R))
-
     S = inv(Sinv)
 
-    # We make a permutation matrix P^(-1) for which the matrix P^(-1)S^(-1) = (SP)^(-1) has rows of decreasing
-    # Euclidian norm.
-    permutation = np.argsort(norm(Sinv,axis=0))
-    m = len(permutation)
-    Pinv = np.zeros((m,m))
-    for i in range(m):
-        Pinv[i,permutation[i]] = 1
+    permutation = np.argsort(norm(Sinv, axis=0))
+    Pinv = np.zeros((m, m))
+    Pinv[np.arange(m), permutation] = 1
 
     P = inv(Pinv)
-
-    # We apply the same permutation to the columns of S, and obtain the matrix SP.
     SP = S.dot(P)
-    SPt = SP.transpose()
+    H = SP.T.dot(SP)
 
-    # We now compute the new Gram matrix H, which is the symmetric positive definite matrix defined by the
-    # equation H = (SP)^t (SP).
-    H = SPt.dot(SP)
+    # Apply rational cholesky decomposition on H:
+    E, V = cholesky_DU(H)
 
-    # We apply the rational cholesky decomposition on H:
-    E,V = cholesky_DU(H)
-
-
-    # Now we apply the original Fincke-Pohst algorithm to the quadratic form corresponding to the new
-    # Gram matrix H:
-
-    results = []
-    zero_vector = np.zeros((m))
-    results.append(zero_vector)
-
+    results = [np.zeros((m))]
     for k in range(m - 1, -1, -1):
-
         new_results = []
 
         for r in results:
-            z = r
-
-            # Sk = sum_{i=k+1}^{m} ( E[i,i] * (z[i] + sum_{j=i+1}^{m] ( V[i,j] * z[j] ) )^2 )
+            z = r.copy()
             Sk = sum(E[i, i] * (z[i] + sum(V[i, j] * z[j] for j in range(i + 1, m))) ** 2 for i in range(k + 1, m))
-
-            # Tk = sum_{j=k+1}^{m} ( V[k,j] * z[j] )
             Tk = sum(V[k, j] * z[j] for j in range(k + 1, m))
 
             lower_bound = math.ceil(- math.sqrt((C - Sk) / E[k, k]) - Tk)
             upper_bound = math.floor(math.sqrt((C - Sk) / E[k, k]) - Tk)
 
-            # The possible values for zk are the integers in the range lowerBound to upperBound.
-            # The list of partial results from the previous step is extended by including each
-            # possible value of the new coefficient.
-            for zk in range(int(lower_bound), int(upper_bound) + 1, 1):
+            for zk in range(lower_bound, upper_bound + 1):
                 z[k] = zk
-                new_results.append(deepcopy(z))
+                new_results.append(z.copy())
 
         results = new_results
 
-
-
     vector_list = []
     for z in results:
-        # z gives the coefficient vectors from the application of the FP algorithm on the reduced
-        # Gram matrix H:
-        np.asarray(z)
-
-        # y gives the permuted coefficient vectors y = Px.
         y = P.dot(z)
-
-        # x gives the coefficient vectors x = Xy before the LLL algorithm.
         x = X.dot(y)
-
-        # w gives the short lattice vectors w = Bx.
         w = B.dot(x)
 
-        # Make sure there are no round-off errors.
-        for i in range(len(w)):
-            w[i] = round(w[i])
-
-        w = w.astype(int)
+        w = np.round(w).astype(int)
         vector_list.append(w)
 
     vector_list.sort(key=norm)
 
     return vector_list
+
