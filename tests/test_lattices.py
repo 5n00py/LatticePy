@@ -3,11 +3,13 @@ import numpy as np
 
 from LatticePy import lattices
 
+
 def test_transform_basis() -> None:
     for _ in range(100):
         X = np.array([[1, 0], [0, 1]])
         T = lattices.transform_basis(X, 5, 5)
         assert lattices.lattice_determinant(T) == pytest.approx(1.0, abs=1e-3)
+
 
 def test_compute_gram_matrix() -> None:
     # Test vector from Bremner, 2012, Example 1.16
@@ -26,3 +28,22 @@ def test_lattice_determinant() -> None:
     # (i.e., can differ by up to 1e-6 * expected_value), but this could be
     # changed by passing a different value to pytest.approx if needed...
     assert det == pytest.approx(np.sqrt(618829))
+
+
+def test_gram_schmidt() -> None:
+    # Test vector from Bremner, 2012, Example 3.3
+    X = np.array([[3, -1, 5], [-5, 2, -1], [-3, 9, 2]])
+    M, Y = lattices.gram_schmidt(X)
+    assert np.allclose(
+        M,
+        np.array(
+            [
+                [3, -1, 5],
+                [-109 / 35, 48 / 35, 15 / 7],
+                [1521 / 566, 1859 / 283, -169 / 566],
+            ]
+        ),
+    )
+    assert np.allclose(
+        Y, np.array([[1, 0, 0], [-22 / 35, 1, 0], [-8 / 35, 909 / 566, 1]])
+    )
