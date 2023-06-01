@@ -157,6 +157,15 @@ def lattice_determinant(X: ndarray) -> float:
     -------
     float
         The determinant of the Lattice L.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> from LatticePy import lattices
+    >>> X = np.array([[-7, -7, 4, -8, -8], [1, 6, -5, 8, -1],[-1, 1, 4, -7, 8]])
+    >>> G = lattices.compute_gram_matrix(X)
+    >>> det = lattices.lattice_determinant(X)
+    >>> assert np.allclose(det, np.sqrt(618829))
     """
     G = compute_gram_matrix(X)
     detG = np.linalg.det(G)
