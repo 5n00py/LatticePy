@@ -74,7 +74,15 @@ def transform_basis(X: ndarray, k: int, r: int) -> ndarray:
     Returns
     -------
     ndarray
-        A 2D ndarray whose row vectors form another basis of the same lattice.
+        An ndarray whose row vectors form another basis of the same lattice.
+
+    Example
+    -------
+    >>> import numpy as np
+    >>> from LatticePy import lattices
+    >>> X = np.array([[1, 0], [0, 1]])
+    >>> T = lattices.transform_basis(X, 5, 5)
+    >>> assert np.allclose(lattices.lattice_determinant(T), 1.0)
     """
 
     m, _ = X.shape

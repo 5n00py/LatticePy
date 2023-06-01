@@ -3,6 +3,11 @@ import numpy as np
 
 from LatticePy import lattices
 
+def test_transform_basis() -> None:
+    for _ in range(100):
+        X = np.array([[1, 0], [0, 1]])
+        T = lattices.transform_basis(X, 5, 5)
+        assert lattices.lattice_determinant(T) == pytest.approx(1.0, abs=1e-3)
 
 def test_compute_gram_matrix() -> None:
     # Test vector from Bremner, 2012, Example 1.16
