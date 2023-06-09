@@ -45,7 +45,6 @@ from copy import deepcopy
 from numpy import ndarray
 from numpy.linalg import inv
 from numpy.linalg import norm
-from numpy.random import randint
 from typing import List
 from typing import Tuple
 
@@ -89,7 +88,7 @@ def transform_basis(X: ndarray, k: int, r: int) -> ndarray:
     >>> from LatticePy import lattices
     >>> X = np.array([[1, 0], [0, 1]])
     >>> T = lattices.transform_basis(X, 5, 5)
-    >>> assert np.allclose(lattices.lattice_determinant(T), 1.0)
+    >>> assert np.allclose(lattices.ldet(T), 1.0)
     """
     if X.shape[0] < 2:
         raise ValueError("X must have at least 2 rows")
@@ -125,7 +124,7 @@ def transform_basis(X: ndarray, k: int, r: int) -> ndarray:
     return X_transformed
 
 
-def compute_gram_matrix(X: ndarray) -> ndarray:
+def gram_matrix(X: ndarray) -> ndarray:
     """
     Computes the Gram matrix of a given lattice.
 
@@ -136,7 +135,7 @@ def compute_gram_matrix(X: ndarray) -> ndarray:
     Parameters
     ----------
     X : ndarray
-        A 2D ndarray representing a matrix. Its rows x1, x2, ..., xm are linearly
+        An ndarray representing a matrix. Its rows x1, x2, ..., xm are linearly
         independent vectors in R^m (m <= n) that span an m-dimensional lattice L.
 
     Returns
@@ -149,28 +148,34 @@ def compute_gram_matrix(X: ndarray) -> ndarray:
     >>> import numpy as np
     >>> from LatticePy import lattices
     >>> X = np.array([[-7, -7, 4, -8, -8], [1, 6, -5, 8, -1],[-1, 1, 4, -7, 8]])
-    >>> G = lattices.compute_gram_matrix(X)
-    >>> assert np.array_equal(G, np.array([[242, -125, 8], [-125, 127, -79], [8, -79, 131]]))
+    >>> G = lattices.gram_matrix(X)
+    >>> G_exp = np.array([
+    ...     [242, -125, 8],
+    ...     [-125, 127, -79],
+    ...     [8, -79, 131]
+    ... ])
+    >>> assert np.array_equal(G, G_exp)
     """
     Xt = X.transpose()
     G = X.dot(Xt)
     return G
 
 
-def lattice_determinant(X: ndarray) -> float:
+def ldet(X: ndarray) -> float:
     """
-    Compute the determinant of a given lattice.
+    Compute the lattice determinant of a given lattice.
 
     The determinant of a lattice L is defined as the square root of the
     determinant of its Gram matrix. The determinant of a lattice does not depend
     on the choice of basis.
+
     There is a geometric interpretation: The determinant is the m-dimensional
     volume of the parallelipiped in R^n whose edges are the lattice basis vectors.
 
     Parameters
     ----------
     X : ndarray
-        A ndarray representing a matrix. Its rows x1, x2, ..., xm are
+        An ndarray representing a matrix. Its rows x1, x2, ..., xm are
         linearly independent vectors in R^m (m <= n) that span an m-dimensional
         lattice L.
 
@@ -184,11 +189,10 @@ def lattice_determinant(X: ndarray) -> float:
     >>> import numpy as np
     >>> from LatticePy import lattices
     >>> X = np.array([[-7, -7, 4, -8, -8], [1, 6, -5, 8, -1],[-1, 1, 4, -7, 8]])
-    >>> G = lattices.compute_gram_matrix(X)
-    >>> det = lattices.lattice_determinant(X)
+    >>> det = lattices.ldet(X)
     >>> assert np.allclose(det, np.sqrt(618829))
     """
-    G = compute_gram_matrix(X)
+    G = gram_matrix(X)
     detG = np.linalg.det(G)
     result = math.sqrt(detG)
     return result
