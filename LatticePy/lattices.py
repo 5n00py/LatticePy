@@ -65,7 +65,7 @@ def transform_basis(X: ndarray, k: int, r: int) -> ndarray:
     Parameters
     ----------
     X : ndarray
-        A 2D ndarray representing a matrix whose rows form a basis of a lattice.
+        An ndarray representing a matrix whose rows form a basis of a lattice.
     k : int
         The number of unimodular row operations to apply to the matrix.
     r : int
@@ -76,6 +76,13 @@ def transform_basis(X: ndarray, k: int, r: int) -> ndarray:
     ndarray
         An ndarray whose row vectors form another basis of the same lattice.
 
+    Raises
+    ------
+    ValueError
+        If the input matrix X has less than 2 rows.
+        If the number of operations k is less than 1.
+        If the range parameter r is less than 1.
+
     Example
     -------
     >>> import numpy as np
@@ -84,32 +91,38 @@ def transform_basis(X: ndarray, k: int, r: int) -> ndarray:
     >>> T = lattices.transform_basis(X, 5, 5)
     >>> assert np.allclose(lattices.lattice_determinant(T), 1.0)
     """
+    if X.shape[0] < 2:
+        raise ValueError("X must have at least 2 rows")
 
-    m, _ = X.shape
+    if k < 1:
+        raise ValueError("k must be at least 1")
+
+    if r < 1:
+        raise ValueError("r must be at least 1")
+
+    X_transformed = X.copy()
+    m = X_transformed.shape[0]
 
     for _ in range(k):
-        operation = randint(1, 4)
+        operation = np.random.randint(1, 4)
 
         # Multiply a row by -1
         if operation == 1:
-            row = randint(0, m)
-            X[row] *= -1
+            row = np.random.randint(0, m)
+            X_transformed[row] *= -1
 
         # Interchange two rows
         elif operation == 2:
-            row1, row2 = randint(0, m, 2)
-            X[[row1, row2]] = X[[row2, row1]]
+            row1, row2 = np.random.choice(m, 2, replace=False)
+            X_transformed[[row1, row2]] = X_transformed[[row2, row1]]
 
         # Add an integral multiple of a row to another row
         else:
-            row1, row2 = randint(0, m, 2)
-            while row1 == row2:
-                row2 = randint(0, m)
+            row1, row2 = np.random.choice(m, 2, replace=False)
+            scalar = np.random.randint(1, r + 1)
+            X_transformed[row1] += scalar * X_transformed[row2]
 
-            scalar = randint(1, r + 1)
-            X[row1] += scalar * X[row2]
-
-    return X
+    return X_transformed
 
 
 def compute_gram_matrix(X: ndarray) -> ndarray:
@@ -259,7 +272,6 @@ def perform_lll_reduction(X: ndarray) -> ndarray:
         If the number of basis vectors exceeds the space dimensionality.
     """
     m, n = X.shape
-
     if m > n:
         raise ValueError("The number of basis vectors exceeds the space dimensionality")
 
