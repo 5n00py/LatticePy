@@ -8,10 +8,11 @@ def test_transform_basis() -> None:
     for _ in range(100):
         X = np.array([[1, 0], [0, 1]])
         T = lattices.transform_basis(X, 5, 5)
+        print("Transformed Basis: ", T)
         assert lattices.ldet(T) == pytest.approx(1.0, abs=1e-3)
 
 
-def test_compute_gram_matrix() -> None:
+def test_gram_matrix() -> None:
     # Test vector from Bremner, 2012, Example 1.16
     X = np.array([[-7, -7, 4, -8, -8], [1, 6, -5, 8, -1], [-1, 1, 4, -7, 8]])
     GM = lattices.gram_matrix(X)
@@ -19,7 +20,7 @@ def test_compute_gram_matrix() -> None:
     assert np.array_equal(GM, E)
 
 
-def test_lattice_determinant() -> None:
+def test_ldet() -> None:
     # Test vector from Bremner, 2012, Example 1.16
     X = np.array([[-7, -7, 4, -8, -8], [1, 6, -5, 8, -1], [-1, 1, 4, -7, 8]])
     det = lattices.ldet(X)
