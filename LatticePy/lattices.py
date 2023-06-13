@@ -253,78 +253,98 @@ def gram_schmidt(X: ndarray) -> Tuple[ndarray, ndarray]:
     return Y, M
 
 
-def perform_lll_reduction(X: ndarray) -> ndarray:
+def reduce_lll(X: ndarray, alpha: float) -> ndarray:
     """
-    Perform Lenstra-Lenstra-Lovasz (LLL) algorithm, a polynomial time lattice
+    Perform the Lenstra-Lenstra-Lovasz (LLL) algorithm, a polynomial time lattice
     reduction algorithm.
 
     Given a "bad" basis of a lattice, this algorithm finds a "good" basis where
     each vector is "almost orthogonal" to the span of the previous vectors.
     The basis is called reduced if
-    ||x_i*||^2 <= 2 ||x_i+1||^2 for 1 <= i < n.
+    ||Y_i*||^2 <= (alpha - mu_{i, i-1}^2) * ||Y_{i-1}*||^2 for 1 < i < n,
+    where Y* denotes the orthogonalized basis and mu is the coefficient matrix.
 
     Parameters
     ----------
     X : ndarray
-        A 2D ndarray representing a matrix where rows are linearly independent
+        A ndarray representing a matrix where rows are linearly independent
         vectors in R^n that span an m-dimensional lattice L.
+
+    alpha : float
+        A real number strictly between 0.25 and 1 (exclusively) which controls 
+        the 'quality' of the basis, i.e., how 'orthogonal' the basis vectors 
+        are. The closer alpha is to 1, the closer the basis vectors are to 
+        being orthogonal.
+        We may also consider alpha = 1, but for this value of the reducton
+        parameter polynomial time cannot be guaranteed.
 
     Returns
     -------
     ndarray
-        A 2D ndarray representing a matrix X' whose rows are a reduced basis of
+        A ndarray representing a matrix Y whose rows are a reduced basis of
         the basis X.
 
     Raises
     ------
     ValueError
         If the number of basis vectors exceeds the space dimensionality.
-    """
+        If alpha is not between 0.25 and 1 (inclusive).
+    """    
     m, n = X.shape
     if m > n:
         raise ValueError("The number of basis vectors exceeds the space dimensionality")
 
-    X = X.astype(float)
+    if not 0.25 < alpha <= 1:
+        raise ValueError("Alpha must be between 0.25 and 1")
 
-    Y, M = gram_schmidt(X)
+    Y = np.copy(X)
+    Ystar = np.copy(X)
+    Ystar, mu = gram_schmidt(Y)
+    gstar = np.array([np.dot(Ystar[i], Ystar[i]) for i in range(m)])
 
-    i = 1
-    while i < m:
-        for j in range(i - 1, -1, -1):
-            mu = int(round(M[i, j]))
-            X[i] -= mu * X[j]
-            if abs(M[i, j]) > 0.5:
-                Y, M = gram_schmidt(X)
-
-        if (i > 0) and (norm(Y[i - 1]) ** 2 > 2 * norm(Y[i]) ** 2):
-            X[i], X[i - 1] = X[i - 1], X[i]  # Interchange X[i] and X[i-1]
-            Y, M = gram_schmidt(X)
-            i -= 1
+    k = 1
+    while k < m:
+        # size reduce
+        for j in range(k-1, -1, -1):
+            r = round(mu[k, j])
+            if r != 0:
+                Y[k] -= r*Y[j]
+                for i in range(j+1):
+                    mu[k, i] -= r*mu[j, i]
+        
+        # Lovasz condition
+        if gstar[k] >= (alpha - mu[k, k-1]**2)*gstar[k-1]:
+            k += 1
         else:
-            i += 1
+            # swap
+            Y[[k-1, k]] = Y[[k, k-1]]
+            Ystar, mu = gram_schmidt(Y)
+            gstar = np.array([np.dot(Ystar[i], Ystar[i]) for i in range(m)])
+            if k > 1:
+                k -= 1
 
-    return X
-
+    return Y
+  
 
 def cholesky_DU(G: ndarray) -> Tuple[ndarray, ndarray]:
     """
     Perform a Cholesky decomposition of a symmetric positive definite mxm matrix G.
     The output is a diagonal mxm matrix D and an upper triangular matrix U with ones on
-    the diagonal such that G = U^tDU. This is a slightly modified version of the classical
-    Cholesky decomposition R^tR.
+    the diagonal such that G = U^tDU. This is a slightly modified version of the 
+    classical Cholesky decomposition R^tR.
 
     Parameters
     ----------
     G : ndarray
-        A 2D ndarray representing a symmetric positive definite mxm matrix.
+        A ndarray representing a symmetric positive definite mxm matrix.
 
     Returns
     -------
     D : ndarray
-        A 2D ndarray representing the diagonal matrix D.
+        A ndarray representing the diagonal matrix D.
 
     U : ndarray
-        A 2D ndarray representing the upper triangular matrix U.
+        A ndarray representing the upper triangular matrix U.
     """
     U = G.astype(float)
     m = len(U)
@@ -352,8 +372,8 @@ def fincke_pohst(Bt: ndarray, C: float) -> List[ndarray]:
     Parameters
     ----------
     Bt : ndarray
-        A 2D ndarray representing a matrix whose rows are linearly independent vectors in R^n
-        that span an m-dimensional lattice L.
+        A 2D ndarray representing a matrix whose rows are linearly independent 
+        vectors in R^n that span an m-dimensional lattice L.
 
     C : float
         An upper bound for the euclidian square length of the lattice vectors.
@@ -447,7 +467,7 @@ def fincke_pohst_with_lll(Bt: ndarray, C: float) -> List[ndarray]:
     R = L.transpose()
 
     Rinv = inv(R)
-    Sinv = perform_lll_reduction(Rinv)
+    Sinv = reduce_lll(Rinv, 0.5)
 
     X = inv(Sinv.dot(R))
     S = inv(Sinv)
