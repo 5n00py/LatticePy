@@ -79,3 +79,65 @@ def test_reduce_lll() -> None:
         ]
     )
     assert np.array_equal(Y, Y_exp)
+
+
+def normalize_basis(R: np.ndarray) -> np.ndarray:
+    """
+    Helper function to normalize the basis vectors of the input lattice such
+    that each component of the basis vectors is non-negative and the order of
+    the basis vectors is [1, 0], [0, 1].
+    """
+    # Adjust the sign of each entry so it is non-negative.
+    for i in range(R.shape[0]):
+        for j in range(R.shape[1]):
+            if R[i, j] < 0:
+                R[i, j] *= -1
+
+    # If the basis vectors are swapped, reorder them.
+    if np.all(R[0] == [0, 1]) and np.all(R[1] == [1, 0]):
+        R = R[::-1]
+
+    return R
+
+
+def test_lll_roundtrips() -> None:
+    for _ in range(100):
+        X = np.array([[1, 0], [0, 1]])
+        T = lattices.transform_basis(X, 5, 5)
+
+        R = lattices.reduce_lll(T, 1)
+        R = normalize_basis(R)
+
+        assert np.array_equal(X, R)
+
+
+def test_lll_alpha_75() -> None:
+    for _ in range(100):
+        X = np.array([[1, 0], [0, 1]])
+        T = lattices.transform_basis(X, 10, 10)
+
+        R = lattices.reduce_lll(T, 0.75)
+        R = normalize_basis(R)
+
+        # Calculate norms for column vectors of T and R
+        T_norms = np.linalg.norm(T, axis=0)
+        R_norms = np.linalg.norm(R, axis=0)
+
+        # Assert that each column in R has a shorter or equal length than in T
+        assert np.all(R_norms <= T_norms)
+
+
+def test_lll_alpha_50() -> None:
+    for _ in range(100):
+        X = np.array([[1, 0], [0, 1]])
+        T = lattices.transform_basis(X, 20, 20)
+
+        R = lattices.reduce_lll(T, 0.50)
+        R = normalize_basis(R)
+
+        # Calculate norms for column vectors of T and R
+        T_norms = np.linalg.norm(T, axis=0)
+        R_norms = np.linalg.norm(R, axis=0)
+
+        # Assert that each column in R has a shorter or equal length than in T
+        assert np.all(R_norms <= T_norms)
